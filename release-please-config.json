@@ -1,0 +1,9 @@
+{
+  "release-type": "python",
+  "packages": {
+    ".": {
+      "package-name": "escrowmint",
+      "include-v-in-tag": true
+    }
+  }
+}

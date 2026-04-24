@@ -160,9 +160,21 @@ Notes:
 - tests use Docker-backed Redis integration cases
 - coverage is enforced from [pyproject.toml](pyproject.toml)
 
+## Release Process
+
+EscrowMint Python uses Conventional Commits and Release Please for semantic versioning and release notes.
+
+- `fix:` -> patch release
+- `feat:` -> minor release
+- `feat!:` or `BREAKING CHANGE:` -> major release
+
+When releasable commits land on `main`, Release Please opens or updates a release PR. Merging that PR updates [CHANGELOG.md](CHANGELOG.md), creates the `vX.Y.Z` tag, creates the GitHub release notes, and then the existing tag workflow publishes the package to PyPI.
+
 ## Docs
 
 - [Direct Path API](docs/DIRECT_API.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Chunk Lease Design](docs/CHUNK_LEASES.md)
 - [Lua Scripts](scripts/README.md)
+- [Changelog](CHANGELOG.md)
+- [Contributing](CONTRIBUTING.md)
