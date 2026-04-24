@@ -27,11 +27,11 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install dependencies
-        run: uv sync --dev
+      - name: Export dependency requirements
+        run: |
+          uv export --no-hashes --no-dev > requirements.txt
 
       - name: Audit dependencies
         uses: pypa/gh-action-pip-audit@v1.1.0
         with:
-          virtual-environment: .venv
-          local: true
+          inputs: requirements.txt
