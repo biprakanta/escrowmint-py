@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/biprakanta/escrowmint-py/compare/v0.2.0...v0.2.1) (2026-04-24)
+
+
+### Bug Fixes
+
+* make PyPI README assets absolute ([55aedaf](https://github.com/biprakanta/escrowmint-py/commit/55aedafae271323016576ee6c3b5a6c03adc53ae))
+* use plain release tags ([bb7cd05](https://github.com/biprakanta/escrowmint-py/commit/bb7cd05b54f1a284992ba4fca3617f6602cc46e8))
+
 ## [0.2.0](https://github.com/biprakanta/escrowmint-py/compare/escrowmint-v0.1.0...escrowmint-v0.2.0) (2026-04-24)
 
 
