@@ -24,3 +24,5 @@ SemVer mapping:
 4. The existing tag workflow publishes the Python package to PyPI.
 
 Prefer squash merges so the final commit title on `main` is a clean Conventional Commit.
+
+For the first public release, make sure at least one merged change on `main` uses a releasable Conventional Commit such as `feat:` or `fix:` so Release Please has a bootstrap point for the initial release PR.
