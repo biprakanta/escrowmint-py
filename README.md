@@ -1,124 +1,134 @@
 # EscrowMint Python
 
-EscrowMint Python is the Python client library for exact, Redis-backed bounded consumption.
+Exact, Redis-backed bounded consumption for shared quotas.
 
-It is designed for cases where many threads, processes, or services need to consume from a shared global quota without allowing the value to go below zero.
+EscrowMint Python is for cases where many threads, processes, or services need to consume from the same global quota without letting it go below zero.
 
-Examples:
+Good fits:
 
-- prepaid credit consumption
+- prepaid credits
 - inventory reservation
 - budget caps
 - worker permit pools
 - campaign spend controls
 
-## Why This Exists
+## Why EscrowMint
 
-There are many good Redis libraries for locks, semaphores, and rate limiting. There are far fewer Python libraries that focus on this narrower contract:
+EscrowMint is not a generic counter library. It is a quota and reservation library with application-level semantics:
 
-- consume from a shared quota
-- never overspend
-- support reservations with expiry
-- stay fast under distributed contention
-- expose clean application-level semantics
+- exact bounded decrement
+- idempotent consume
+- reservation with TTL
+- commit and cancel flow
+- crash recovery via lazy expiry reclaim
 
-That is the gap EscrowMint Python is intended to fill.
+## Install
 
-## Core Model
+Until the first PyPI release, install from GitHub:
 
-EscrowMint Python is not a generic counter library. It is a quota and reservation library.
+```bash
+uv add git+https://github.com/biprakanta/escrowmint-py
+```
 
-The minimal primitives are:
+or:
 
-- `try_consume(resource, amount, idempotency_key=None)`
-- `reserve(resource, amount, ttl_ms, reservation_id=None)`
-- `commit(resource, reservation_id)`
-- `cancel(resource, reservation_id)`
-- `get_state(resource)`
+```bash
+pip install git+https://github.com/biprakanta/escrowmint-py
+```
 
-These operations are executed atomically in Redis via Lua scripts or Redis Functions.
+## Quickstart
 
-## Package
+```python
+from escrowmint import Client
 
-The package name is `escrowmint`.
+client = Client.from_url("redis://localhost:6379/0")
 
-The current implementation includes:
+result = client.try_consume(
+    "wallet:123",
+    5,
+    idempotency_key="req-001",
+)
 
-- `try_consume`
-- `reserve`
-- `commit`
-- `cancel`
-- `get_state`
-- TTL-based lazy reservation reclamation for crash recovery
+print(result.applied)      # True
+print(result.remaining)    # remaining global quota
+```
+
+## Crash-Safe Reservation
+
+```python
+from escrowmint import Client, ReservationExpired
+
+client = Client.from_url("redis://localhost:6379/0")
+
+reservation = client.reserve(
+    "wallet:123",
+    10,
+    ttl_ms=30_000,
+)
+
+try:
+    result = client.commit("wallet:123", reservation.reservation_id)
+except ReservationExpired:
+    # the hold expired and the quota was released
+    ...
+```
+
+If a worker crashes after `reserve` but before `commit`, the held quota is released after TTL expiry on the next mutation or `get_state` call for that same resource.
+
+## Current API
+
+```python
+client.try_consume(resource, amount, idempotency_key=None)
+client.reserve(resource, amount, ttl_ms=..., reservation_id=None)
+client.commit(resource, reservation_id)
+client.cancel(resource, reservation_id)
+client.get_state(resource)
+```
+
+## How It Works
+
+- Redis remains the source of truth for each resource.
+- Lua scripts make each operation atomic.
+- Reservations move units from `available` to `reserved`.
+- Expired reservations are reclaimed lazily on the next touch of that resource.
+
+## V1 vs V2
+
+Use the current v1 model for most workloads:
+
+- exact correctness
+- simple Redis-first deployment
+- reservation lifecycle with crash recovery
+
+Planned v2 is for very hot resources:
+
+- escrow or chunk allocation per worker
+- fewer Redis round trips on the hottest path
+- more complexity in exchange for higher throughput
+
+See [docs/V2_ESCROW.md](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/docs/V2_ESCROW.md).
 
 ## Development
 
-EscrowMint Python uses `uv` for dependency management, virtual environments, locking, building, and publishing.
+EscrowMint Python uses `uv`.
 
-Common commands:
-
-- `uv sync --dev`
-- `uv run pytest`
-- `uv run ruff check`
-- `uv build`
-
-The local interpreter is pinned via [`.python-version`](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/.python-version), and the dependency lockfile is [uv.lock](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/uv.lock).
-
-The test suite includes Docker-backed Redis integration tests. Running `uv run pytest` requires a working local Docker installation.
-
-Coverage is enforced via [pyproject.toml](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/pyproject.toml) with `--cov-fail-under=90`.
-
-Expired reservations are released lazily on the next mutation or `get_state` call for the same resource. V1 does not run a background sweeper.
-
-## Packaging
-
-The package metadata lives in [pyproject.toml](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/pyproject.toml) and uses `uv_build`, which is the current build backend generated by `uv init --lib`.
-
-For PyPI publishing, the intended flow is:
-
-- build with `uv build`
-- publish with `uv publish`
-- authenticate with PyPI Trusted Publishing from GitHub Actions
-
-## Proposed Repo Layout
-
-```text
-escrowmint-py/
-  README.md
-  LICENSE
-  pyproject.toml
-  docs/
-    ARCHITECTURE.md
-    V1_API.md
-    V2_ESCROW.md
-  scripts/
-    try_consume.lua
-    reserve.lua
-    commit.lua
-    cancel.lua
-    get_state.lua
-  src/
-    escrowmint/
-  .github/
-    workflows/
-      ci.yml
-  tests/
+```bash
+uv sync --dev
+uv run ruff check
+uv run pytest
+uv build
 ```
 
-## V1 Priorities
+Notes:
 
-1. Exact bounded decrement with idempotency
-2. Reservation lifecycle with TTL
-3. Clean errors and observability hooks
-4. Redis Cluster-safe keying strategy
-5. Python packaging and test automation
+- Python version is pinned in [`.python-version`](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/.python-version)
+- dependencies are locked in [uv.lock](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/uv.lock)
+- tests use Docker-backed Redis integration cases
+- coverage is enforced from [pyproject.toml](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/pyproject.toml)
 
-## Future Extensions
+## Docs
 
-- v2 escrow or chunk allocation for very hot resources
-- async Python client
-- background scavenging helpers
-- metrics exporters
-- Redis Functions as the default backend
-
-See [docs/V1_API.md](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/docs/V1_API.md), [docs/ARCHITECTURE.md](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/docs/ARCHITECTURE.md), and [docs/V2_ESCROW.md](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/docs/V2_ESCROW.md) for the current and next-step design.
+- [V1 API](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/docs/V1_API.md)
+- [Architecture](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/docs/ARCHITECTURE.md)
+- [V2 Escrow Design](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/docs/V2_ESCROW.md)
+- [Lua Scripts](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/scripts/README.md)
