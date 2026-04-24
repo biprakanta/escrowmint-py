@@ -3,7 +3,8 @@
   "packages": {
     ".": {
       "package-name": "escrowmint",
-      "include-v-in-tag": true
+      "include-v-in-tag": true,
+      "include-component-in-tag": false
     }
   }
 }
