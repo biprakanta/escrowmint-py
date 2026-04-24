@@ -119,19 +119,26 @@ This is the authoritative distributed chunk path. It keeps chunk state in Redis 
 
 ## V1 vs V2
 
-Use the current v1 model for most workloads:
+EscrowMint currently ships both models.
 
-- exact correctness
-- simple Redis-first deployment
-- reservation lifecycle with crash recovery
+V1 is the direct resource path:
 
-Use v2 chunk leases when a resource needs an explicit worker-owned allocation model:
+- `try_consume`, `reserve`, `commit`, and `cancel`
+- exact bounded updates against the resource's shared state
+- the simplest way to get correctness and crash recovery
 
-- escrow or chunk allocation per worker
-- cleaner lease-level accounting than touching global availability on every operation
-- more complexity in exchange for better control over very hot resources
+V2 adds a worker-owned lease layer on top of that model:
 
-The current v2 implementation is the authoritative lease lifecycle. A purely local in-process chunk buffer is still something callers can layer on top if they want to trade off crash recovery for fewer network round trips.
+- `allocate_chunk`, `consume_chunk`, `renew_chunk`, `release_chunk`, and `get_chunk`
+- explicit escrow or chunk allocation per worker
+- better control over hot-resource ownership, refill, expiry, and reclaim
+- more operational complexity than the direct v1 path
+
+Choose v1 when you want the simplest exact path.
+
+Choose v2 when a resource benefits from explicit worker-level quota management.
+
+The current v2 implementation is an authoritative Redis-backed lease lifecycle. It improves the state model for hot resources, but it does not automatically become a no-Redis local fast path. If you want fewer Redis round trips than the shipped v2 API provides, you can layer an in-process chunk consumer on top of the authoritative lease lifecycle.
 
 See [docs/V2_ESCROW.md](docs/V2_ESCROW.md).
 
