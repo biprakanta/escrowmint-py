@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo-transparent.png" alt="EscrowMint logo" width="180">
+  <img src="https://raw.githubusercontent.com/biprakanta/escrowmint-py/main/logo-transparent.png" alt="EscrowMint logo" width="180">
 </p>
 
 <h1 align="center">EscrowMint Python</h1>
@@ -36,16 +36,16 @@ EscrowMint is not a generic counter library. It is a quota and reservation libra
 
 ## Install
 
-Until the first PyPI release, install from GitHub:
+Install from PyPI:
 
 ```bash
-uv add git+https://github.com/biprakanta/escrowmint-py
+uv add escrowmint
 ```
 
 or:
 
 ```bash
-pip install git+https://github.com/biprakanta/escrowmint-py
+pip install escrowmint
 ```
 
 ## Quickstart
