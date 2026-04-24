@@ -122,6 +122,7 @@ This avoids application-level races and extra lock coordination.
 Atomic Redis scripting solves correctness, but it does not remove per-resource serialization. A single extremely hot resource will still serialize.
 
 For very hot resources, a future v2 can add escrow or chunk allocation.
+See [V2_ESCROW.md](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/docs/V2_ESCROW.md).
 
 ### Cross-Resource Transactions
 
