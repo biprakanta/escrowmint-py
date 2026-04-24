@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/biprakanta/escrowmint-py/compare/v0.2.1...v0.3.0) (2026-04-24)
+
+
+### Features
+
+* support Python 3.8+ ([#6](https://github.com/biprakanta/escrowmint-py/issues/6)) ([d64b909](https://github.com/biprakanta/escrowmint-py/commit/d64b90932050e92823caa3c6f5f705173740e72a))
+
+
+### Bug Fixes
+
+* guard README install instructions ([f6d2943](https://github.com/biprakanta/escrowmint-py/commit/f6d294308a35f27994989b2458e52bc6fa6f2bd3))
+* use grep in README guard ([#5](https://github.com/biprakanta/escrowmint-py/issues/5)) ([9ad46aa](https://github.com/biprakanta/escrowmint-py/commit/9ad46aa15b14808826f8041a03d0fd508224723c))
+
 ## [0.2.1](https://github.com/biprakanta/escrowmint-py/compare/v0.2.0...v0.2.1) (2026-04-24)
 
 
