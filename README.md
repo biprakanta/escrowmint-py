@@ -8,6 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/biprakanta/escrowmint-py/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/biprakanta/escrowmint-py/ci.yml?branch=main&label=CI"></a>
+  <img alt="Coverage" src="https://img.shields.io/badge/coverage-94.58%25-brightgreen">
   <a href="https://github.com/biprakanta/escrowmint-py/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/biprakanta/escrowmint-py"></a>
   <img alt="Python" src="https://img.shields.io/badge/python-3.13%2B-blue">
 </p>
