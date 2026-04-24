@@ -1,6 +1,6 @@
 [project]
 name = "escrowmint"
-version = "0.3.0"
+version = "0.3.1"
 description = "Python client for exact Redis-backed bounded consumption."
 readme = "README.md"
 requires-python = ">=3.8"
