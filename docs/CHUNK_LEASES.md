@@ -1,6 +1,6 @@
-# V2 Escrow / Chunk Allocation
+# Chunk Lease Path
 
-This document describes the shipped v2 chunk-lease model for very hot resources.
+This document describes the shipped chunk-lease model for very hot resources.
 
 The current client now supports the authoritative lease lifecycle in Redis:
 
@@ -10,13 +10,13 @@ The current client now supports the authoritative lease lifecycle in Redis:
 - `release_chunk`
 - `get_chunk`
 
-## Why V2 Exists
+## Why The Chunk Lease Path Exists
 
-The v1 model gives exact correctness for a single resource, but each resource is still serialized at Redis.
+The direct path gives exact correctness for a single resource, but each resource is still serialized at Redis.
 
 That is usually fine until one resource becomes extremely hot. At that point, the bottleneck is not correctness. The bottleneck is that every request still reaches the same authoritative resource state.
 
-V2 addresses that by adding explicit worker-owned chunk leases to the same overall correctness model.
+The chunk lease path addresses that by adding explicit worker-owned chunk leases to the same overall correctness model.
 
 ## Core Idea
 
@@ -47,15 +47,15 @@ This is an escrow model.
 
 ## Important Clarification
 
-The shipped v2 API is still authoritative and Redis-backed.
+The shipped chunk API is still authoritative and Redis-backed.
 
 That means:
 
 - `consume_chunk` still updates Redis-backed lease state
-- v2 does not replace v1; it adds an explicit worker-owned lease path
-- v2 by itself does not guarantee fewer Redis round trips per consume than a custom local buffered consumer would
+- the chunk lease path does not replace the direct path; it adds an explicit worker-owned lease path
+- the chunk lease path by itself does not guarantee fewer Redis round trips per consume than a custom local buffered consumer would
 
-If you want a true local hot path, build it on top of the v2 lease lifecycle by allocating a chunk from Redis and then managing a small in-process sub-allocation buffer per worker.
+If you want a true local hot path, build it on top of the chunk lease lifecycle by allocating a chunk from Redis and then managing a small in-process sub-allocation buffer per worker.
 
 ## Current Concepts
 
@@ -83,7 +83,7 @@ That allows:
 - lease heartbeats
 - lease reclaim on timeout
 
-## Current V2 API
+## Current Chunk API
 
 Python:
 
@@ -152,7 +152,7 @@ Resource-local keys:
 
 ## Invariants
 
-V2 must preserve:
+The chunk lease path must preserve:
 
 - `available >= 0`
 - `reserved >= 0`
@@ -184,8 +184,8 @@ V2 must preserve:
 
 ## Rollout Guidance
 
-- keep v1 APIs as the default path for ordinary resources
-- use v2 only for explicitly hot resources
+- keep the direct-path APIs as the default path for ordinary resources
+- use the chunk lease path only for explicitly hot resources
 - choose a stable per-worker `owner_id`
 - use renew or release to keep leases tidy when workers are healthy
 - rely on expiry reclaim as the safety net for abandoned active leases

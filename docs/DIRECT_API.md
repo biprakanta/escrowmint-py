@@ -1,6 +1,6 @@
-# V1 API
+# Direct Path API
 
-This document defines the minimal v1 public API for EscrowMint Python.
+This document defines the direct-path public API for EscrowMint Python.
 
 ## Design Rules
 
@@ -23,7 +23,7 @@ A logical shared quota bucket, such as:
 
 A positive integer unit to consume or reserve.
 
-V1 intentionally uses integer arithmetic only.
+The direct path intentionally uses integer arithmetic only.
 
 ### Reservation
 
@@ -95,7 +95,7 @@ class Client:
 
 ## Error Model
 
-V1 should use typed errors instead of string matching.
+The direct path should use typed errors instead of string matching.
 
 Common errors:
 
@@ -144,7 +144,7 @@ Common errors:
 
 - returns current logical view for one resource
 - performs bounded lazy expiry reclaim for that resource before returning
-- v1 does not promise a globally linearizable read across multiple resources
+- the direct path does not promise a globally linearizable read across multiple resources
 
 ## Recommended Defaults
 
@@ -152,7 +152,7 @@ Common errors:
 - reservation TTL: caller-defined, with a sane minimum and maximum
 - all resource operations isolated by resource key
 
-## What V1 Should Avoid
+## What The Direct Path Should Avoid
 
 - floating-point amounts
 - multi-resource atomic transactions

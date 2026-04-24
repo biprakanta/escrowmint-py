@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes a Redis-first architecture for EscrowMint v1.
+This document describes a Redis-first architecture for EscrowMint's direct path.
 
 ## Principle
 
@@ -101,13 +101,13 @@ Using one key per idempotency token keeps expiry simple and portable.
 
 ## Expiry Strategy
 
-V1 should use lazy expiration first.
+The direct path should use lazy expiration first.
 
 That means expired reservations are reclaimed during normal operations on the same resource, instead of requiring a global background sweeper.
 
 Reclaim is intentionally bounded per call by an expiry sorted set scan, which avoids full `HGETALL` passes over every reservation on the hot path.
 
-This keeps v1 simple while preserving correctness.
+This keeps the direct path simple while preserving correctness.
 
 ## Why Lua or Redis Functions
 
@@ -123,10 +123,10 @@ This avoids application-level races and extra lock coordination.
 
 ### Single Resource Hot Spot
 
-Atomic Redis scripting solves correctness, but it does not remove per-resource serialization for the v1 path. A single extremely hot resource can still bottleneck if every request goes through global state updates.
+Atomic Redis scripting solves correctness, but it does not remove per-resource serialization for the direct path. A single extremely hot resource can still bottleneck if every request goes through global state updates.
 
-EscrowMint now includes v2 chunk leases for hot resources. They reduce pressure on the global resource path by allocating worker-owned quota chunks, but lease lifecycle operations still serialize at Redis and local chunk consumption is only faster when an application reuses a lease across many requests.
-See [V2_ESCROW.md](V2_ESCROW.md).
+EscrowMint also includes chunk leases for hot resources. They reduce pressure on the global resource path by allocating worker-owned quota chunks, but lease lifecycle operations still serialize at Redis and local chunk consumption is only faster when an application reuses a lease across many requests.
+See [CHUNK_LEASES.md](CHUNK_LEASES.md).
 
 ### Cross-Resource Transactions
 
