@@ -192,4 +192,3 @@ When releasable commits land on `main`, Release Please opens or updates a releas
 - [Lua Scripts](scripts/README.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
-- [Release Checklist](RELEASE_CHECKLIST.md)
