@@ -54,58 +54,55 @@ end
 
 local state_key = KEYS[1]
 local reservations_key = KEYS[2]
-local idem_key = KEYS[3]
 
 local amount = tonumber(ARGV[1])
-local operation_id = ARGV[2]
-local idem_ttl_ms = tonumber(ARGV[3])
-local request_fingerprint = ARGV[4]
+local ttl_ms = tonumber(ARGV[2])
+local reservation_id = ARGV[3]
 
 if amount == nil or amount <= 0 then
   return redis.error_reply("INVALID_AMOUNT")
 end
 
+if ttl_ms == nil or ttl_ms <= 0 then
+  return redis.error_reply("INVALID_TTL")
+end
+
 local available, reserved, version, current_ms = reclaim_expired(state_key, reservations_key)
 
-if idem_key ~= nil and idem_key ~= "" then
-  local existing = redis.call("GET", idem_key)
-  if existing then
-    local payload = cjson.decode(existing)
-    if payload["request_fingerprint"] ~= request_fingerprint then
-      return redis.error_reply("DUPLICATE_IDEMPOTENCY_CONFLICT")
-    end
-    return cjson.encode({
-      applied = payload["applied"],
-      remaining = payload["remaining"],
-      operation_id = payload["operation_id"],
-    })
+local existing = redis.call("HGET", reservations_key, reservation_id)
+if existing then
+  local payload = cjson.decode(existing)
+  local existing_amount = tonumber(payload["amount"])
+  if payload["status"] == "pending" and existing_amount == amount and tonumber(payload["expires_at_ms"]) > current_ms then
+    return cjson.encode(payload)
   end
+  if payload["status"] == "expired" then
+    return redis.error_reply("RESERVATION_EXPIRED")
+  end
+  if payload["status"] == "committed" then
+    return redis.error_reply("RESERVATION_ALREADY_COMMITTED")
+  end
+  return redis.error_reply("DUPLICATE_IDEMPOTENCY_CONFLICT")
 end
 
-local applied = false
-local remaining = available
-
-if available >= amount then
-  remaining = available - amount
-  applied = true
-  version = version + 1
-  persist_state(state_key, remaining, reserved, version)
+if available < amount then
+  return redis.error_reply("INSUFFICIENT_QUOTA")
 end
 
-local result = {
-  applied = applied,
-  remaining = remaining,
-  operation_id = operation_id,
+local expires_at_ms = current_ms + ttl_ms
+available = available - amount
+reserved = reserved + amount
+version = version + 1
+persist_state(state_key, available, reserved, version)
+
+local reservation = {
+  reservation_id = reservation_id,
+  resource = string.match(state_key, "{(.*)}") or "",
+  amount = amount,
+  expires_at_ms = expires_at_ms,
+  status = "pending",
 }
 
-if idem_key ~= nil and idem_key ~= "" then
-  local payload = {
-    request_fingerprint = request_fingerprint,
-    applied = applied,
-    remaining = remaining,
-    operation_id = operation_id,
-  }
-  redis.call("SET", idem_key, cjson.encode(payload), "PX", idem_ttl_ms)
-end
+redis.call("HSET", reservations_key, reservation_id, cjson.encode(reservation))
 
-return cjson.encode(result)
+return cjson.encode(reservation)

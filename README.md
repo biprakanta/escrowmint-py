@@ -49,6 +49,15 @@ The Python client should expose:
 - typed exceptions
 - integration tests against a real Redis instance
 
+The current implementation includes:
+
+- `try_consume`
+- `reserve`
+- `commit`
+- `cancel`
+- `get_state`
+- TTL-based lazy reservation reclamation for crash recovery
+
 ## Development
 
 EscrowMint Python uses `uv` for dependency management, virtual environments, locking, building, and publishing.
@@ -65,6 +74,8 @@ The local interpreter is pinned via [`.python-version`](/Users/biprakantapal/Des
 The test suite includes Docker-backed Redis integration tests. Running `uv run pytest` requires a working local Docker installation.
 
 Coverage is enforced via [pyproject.toml](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/pyproject.toml) with `--cov-fail-under=90`.
+
+Expired reservations are released lazily on the next mutation or `get_state` call for the same resource. V1 does not run a background sweeper.
 
 ## Packaging
 

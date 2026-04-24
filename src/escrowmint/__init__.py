@@ -7,8 +7,12 @@ from .errors import (
     EscrowMintError,
     InsufficientQuota,
     InvalidAmount,
+    InvalidTTL,
+    ReservationAlreadyCommitted,
+    ReservationExpired,
+    ReservationNotFound,
 )
-from .models import ConsumeResult, ResourceState
+from .models import ConsumeResult, Reservation, ResourceState
 
 __all__ = [
     "BackendUnavailable",
@@ -19,5 +23,10 @@ __all__ = [
     "EscrowMintError",
     "InsufficientQuota",
     "InvalidAmount",
+    "InvalidTTL",
+    "Reservation",
+    "ReservationAlreadyCommitted",
+    "ReservationExpired",
+    "ReservationNotFound",
     "ResourceState",
 ]
