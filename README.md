@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.png" alt="EscrowMint logo" width="180">
+  <img src="logo-transparent.png" alt="EscrowMint logo" width="180">
 </p>
 
 <h1 align="center">EscrowMint Python</h1>
