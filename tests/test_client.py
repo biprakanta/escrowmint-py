@@ -1,6 +1,7 @@
 import concurrent.futures
 import time
 from pathlib import Path
+from typing import Dict, List, Optional
 
 import pytest
 from redis import Redis
@@ -518,18 +519,18 @@ def test_try_consume_handles_concurrent_requests_without_overspending(redis_url:
 
 
 class _ScriptStub:
-    def __init__(self, result: str = "{}", exc: Exception | None = None) -> None:
+    def __init__(self, result: str = "{}", exc: Optional[Exception] = None) -> None:
         self._result = result
         self._exc = exc
 
-    def __call__(self, *, keys: list[str], args: list[object]) -> str:
+    def __call__(self, *, keys: List[str], args: List[object]) -> str:
         if self._exc is not None:
             raise self._exc
         return self._result
 
 
 class _RedisStub:
-    def __init__(self, script_stubs: list[_ScriptStub] | None = None) -> None:
+    def __init__(self, script_stubs: Optional[List[_ScriptStub]] = None) -> None:
         self._script_stubs = list(script_stubs or [])
 
     def register_script(self, _: str) -> _ScriptStub:
@@ -540,7 +541,7 @@ class _RedisStub:
     def delete(self, *keys: str) -> None:
         return None
 
-    def hset(self, key: str, mapping: dict[str, int]) -> None:
+    def hset(self, key: str, mapping: Dict[str, int]) -> None:
         return None
 
 

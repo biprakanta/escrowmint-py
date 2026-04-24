@@ -69,6 +69,31 @@ jobs:
       - name: Build distributions
         run: uv build
 
+  test-python38:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.8"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run lint
+        run: uv run ruff check
+
+      - name: Run tests
+        run: uv run pytest
+
   publish-coverage-badge:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: lint-test-build
