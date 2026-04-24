@@ -2,6 +2,7 @@ import hashlib
 import json
 import uuid
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 from redis import Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
@@ -49,7 +50,7 @@ class ClientConfig:
 
 
 class Client:
-    def __init__(self, config: ClientConfig, *, redis_client: Redis | None = None) -> None:
+    def __init__(self, config: ClientConfig, *, redis_client: Optional[Redis] = None) -> None:
         self.config = config
         self._redis = redis_client or Redis.from_url(
             config.redis_url,
@@ -76,7 +77,7 @@ class Client:
         resource: str,
         amount: int,
         *,
-        idempotency_key: str | None = None,
+        idempotency_key: Optional[str] = None,
     ) -> ConsumeResult:
         if amount <= 0:
             raise InvalidAmount("amount must be a positive integer")
@@ -119,7 +120,7 @@ class Client:
         amount: int,
         *,
         ttl_ms: int,
-        reservation_id: str | None = None,
+        reservation_id: Optional[str] = None,
     ) -> Reservation:
         if amount <= 0:
             raise InvalidAmount("amount must be a positive integer")
@@ -209,7 +210,7 @@ class Client:
         *,
         owner_id: str,
         ttl_ms: int,
-        lease_id: str | None = None,
+        lease_id: Optional[str] = None,
     ) -> ChunkLease:
         if amount <= 0:
             raise InvalidAmount("amount must be a positive integer")
@@ -369,7 +370,7 @@ class Client:
     def _chunk_receipt_key(self, resource: str, lease_id: str) -> str:
         return f"{self.config.key_prefix}:{{{resource}}}:chunk_receipt:{lease_id}"
 
-    def _resource_keys(self, resource: str) -> list[str]:
+    def _resource_keys(self, resource: str) -> List[str]:
         return [
             self._state_key(resource),
             self._reservations_key(resource),
@@ -378,18 +379,18 @@ class Client:
             self._chunk_expiries_key(resource),
         ]
 
-    def _idempotency_key(self, resource: str, idempotency_key: str | None) -> str:
+    def _idempotency_key(self, resource: str, idempotency_key: Optional[str]) -> str:
         if not idempotency_key:
             return ""
         return f"{self.config.key_prefix}:{{{resource}}}:idem:{idempotency_key}"
 
-    def _resource_auxiliary_keys(self, resource: str) -> list[str]:
+    def _resource_auxiliary_keys(self, resource: str) -> List[str]:
         patterns = (
             f"{self.config.key_prefix}:{{{resource}}}:idem:*",
             f"{self.config.key_prefix}:{{{resource}}}:receipt:*",
             f"{self.config.key_prefix}:{{{resource}}}:chunk_receipt:*",
         )
-        keys: list[str] = []
+        keys: List[str] = []
         for pattern in patterns:
             keys.extend(self._redis.scan_iter(match=pattern))
         return keys
@@ -433,13 +434,13 @@ class Client:
         raise exc
 
     @staticmethod
-    def _load_payload(raw_result: str) -> dict[str, object]:
+    def _load_payload(raw_result: str) -> Dict[str, Any]:
         try:
             return json.loads(raw_result)
         except json.JSONDecodeError as exc:
             raise CorruptState("backend returned malformed result") from exc
 
-    def _run_script(self, script: object, *, keys: list[str], args: list[object]) -> str:
+    def _run_script(self, script: object, *, keys: List[str], args: List[object]) -> str:
         try:
             return script(keys=keys, args=args)
         except ResponseError as exc:

@@ -10,7 +10,7 @@
   <a href="https://github.com/biprakanta/escrowmint-py/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/biprakanta/escrowmint-py/ci.yml?branch=main&label=CI"></a>
   <a href="https://github.com/biprakanta/escrowmint-py/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/biprakanta/escrowmint-py?display_name=tag"></a>
   <a href="https://github.com/biprakanta/escrowmint-py/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/biprakanta/escrowmint-py"></a>
-  <img alt="Python" src="https://img.shields.io/badge/python-3.13%2B-blue">
+  <img alt="Python" src="https://img.shields.io/badge/python-3.8%2B-blue">
   <img alt="Coverage" src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/biprakanta/escrowmint-py/badges/coverage.json">
 </p>
 
@@ -170,7 +170,7 @@ Notes:
 
 ## Support
 
-- Python: `3.13+`
+- Python: `3.8+`
 - Redis: intended for modern Redis deployments that support Lua scripting and standard key expiry semantics
 - Stability: the package is approaching its first public `0.1.x` release; expect the core API to be much more stable than the surrounding release/docs tooling
 
