@@ -330,12 +330,15 @@ class Client:
     def seed_available(self, resource: str, amount: int) -> None:
         if amount < 0:
             raise InvalidAmount("seed amount must be zero or greater")
-        self._redis.delete(
+        keys_to_delete = [
             self._reservations_key(resource),
             self._expiries_key(resource),
             self._chunk_leases_key(resource),
             self._chunk_expiries_key(resource),
-        )
+        ]
+        keys_to_delete.extend(self._resource_auxiliary_keys(resource))
+        if keys_to_delete:
+            self._redis.delete(*keys_to_delete)
         self._redis.hset(
             self._state_key(resource),
             mapping={
@@ -379,6 +382,17 @@ class Client:
         if not idempotency_key:
             return ""
         return f"{self.config.key_prefix}:{{{resource}}}:idem:{idempotency_key}"
+
+    def _resource_auxiliary_keys(self, resource: str) -> list[str]:
+        patterns = (
+            f"{self.config.key_prefix}:{{{resource}}}:idem:*",
+            f"{self.config.key_prefix}:{{{resource}}}:receipt:*",
+            f"{self.config.key_prefix}:{{{resource}}}:chunk_receipt:*",
+        )
+        keys: list[str] = []
+        for pattern in patterns:
+            keys.extend(self._redis.scan_iter(match=pattern))
+        return keys
 
     @staticmethod
     def _fingerprint(*, resource: str, amount: int) -> str:

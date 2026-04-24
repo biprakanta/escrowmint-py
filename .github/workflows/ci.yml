@@ -12,11 +12,13 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   lint-test-build:
     runs-on: ubuntu-latest
+    outputs:
+      coverage: ${{ steps.coverage.outputs.value }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -40,20 +42,47 @@ jobs:
       - name: Run tests
         run: uv run pytest | tee pytest-output.txt
 
-      - name: Generate coverage badge data
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Extract coverage
+        id: coverage
         run: |
           python - <<'PY'
-          import json
+          import os
           import pathlib
           import re
 
           text = pathlib.Path("pytest-output.txt").read_text()
-          match = re.search(r"Total coverage: ([0-9]+\.[0-9]+)%", text)
+          match = re.search(r"Total coverage: ([0-9]+(?:\.[0-9]+)?)%", text)
           if match is None:
               raise SystemExit("Could not find coverage in pytest output")
 
           value = float(match.group(1))
+          with pathlib.Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as fh:
+              fh.write(f"value={value:.2f}\n")
+          PY
+
+      - name: Build distributions
+        run: uv build
+
+  publish-coverage-badge:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: lint-test-build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Generate coverage badge data
+        env:
+          COVERAGE: ${{ needs.lint-test-build.outputs.coverage }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+
+          value = float(os.environ["COVERAGE"])
           if value >= 90:
               color = "brightgreen"
           elif value >= 80:
@@ -77,12 +106,8 @@ jobs:
           PY
 
       - name: Publish coverage badge data
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ github.token }}
           publish_branch: badges
           publish_dir: ./badge-data
-
-      - name: Build distributions
-        run: uv build

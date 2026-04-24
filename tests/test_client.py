@@ -64,6 +64,23 @@ def test_seed_available_rejects_negative_amount() -> None:
         client.seed_available("wallet:1", -1)
 
 
+def test_seed_available_clears_stale_replay_keys(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    client.seed_available("wallet:stale", 10)
+    client.try_consume("wallet:stale", 3, idempotency_key="req-1")
+
+    receipt_key = client._receipt_key("wallet:stale", "res-1")
+    chunk_receipt_key = client._chunk_receipt_key("wallet:stale", "lease-1")
+    client._redis.set(receipt_key, "{}")
+    client._redis.set(chunk_receipt_key, "{}")
+
+    client.seed_available("wallet:stale", 20)
+
+    assert not client._redis.exists(client._idempotency_key("wallet:stale", "req-1"))
+    assert not client._redis.exists(receipt_key)
+    assert not client._redis.exists(chunk_receipt_key)
+
+
 def test_embedded_lua_matches_repo_scripts() -> None:
     def normalize(script: str) -> str:
         return "\n".join(
