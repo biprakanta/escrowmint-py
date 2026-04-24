@@ -129,7 +129,7 @@ Use v2 chunk leases when a resource needs an explicit worker-owned allocation mo
 
 The current v2 implementation is the authoritative lease lifecycle. A purely local in-process chunk buffer is still something callers can layer on top if they want to trade off crash recovery for fewer network round trips.
 
-See [docs/V2_ESCROW.md](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/docs/V2_ESCROW.md).
+See [docs/V2_ESCROW.md](docs/V2_ESCROW.md).
 
 ## Development
 
@@ -144,14 +144,14 @@ uv build
 
 Notes:
 
-- Python version is pinned in [`.python-version`](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/.python-version)
-- dependencies are locked in [uv.lock](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/uv.lock)
+- Python version is pinned in [`.python-version`](.python-version)
+- dependencies are locked in [uv.lock](uv.lock)
 - tests use Docker-backed Redis integration cases
-- coverage is enforced from [pyproject.toml](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/pyproject.toml)
+- coverage is enforced from [pyproject.toml](pyproject.toml)
 
 ## Docs
 
-- [V1 API](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/docs/V1_API.md)
-- [Architecture](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/docs/ARCHITECTURE.md)
-- [V2 Escrow Design](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/docs/V2_ESCROW.md)
-- [Lua Scripts](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/scripts/README.md)
+- [V1 API](docs/V1_API.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [V2 Escrow Design](docs/V2_ESCROW.md)
+- [Lua Scripts](scripts/README.md)
