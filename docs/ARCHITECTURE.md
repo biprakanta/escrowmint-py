@@ -123,14 +123,14 @@ This avoids application-level races and extra lock coordination.
 
 ### Single Resource Hot Spot
 
-Atomic Redis scripting solves correctness, but it does not remove per-resource serialization. A single extremely hot resource will still serialize.
+Atomic Redis scripting solves correctness, but it does not remove per-resource serialization for the v1 path. A single extremely hot resource can still bottleneck if every request goes through global state updates.
 
-For very hot resources, a future v2 can add escrow or chunk allocation.
-See [V2_ESCROW.md](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/docs/V2_ESCROW.md).
+EscrowMint now includes v2 chunk leases for hot resources. They reduce pressure on the global resource path by allocating worker-owned quota chunks, but lease lifecycle operations still serialize at Redis and local chunk consumption is only faster when an application reuses a lease across many requests.
+See [V2_ESCROW.md](V2_ESCROW.md).
 
 ### Cross-Resource Transactions
 
-V1 should not promise exact atomicity across multiple unrelated resources.
+EscrowMint does not provide exact atomicity across multiple unrelated resources. If you need multi-resource all-or-nothing behavior, you still need a higher-level transaction or saga design above the library.
 
 ## Observability
 

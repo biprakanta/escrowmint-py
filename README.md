@@ -1,6 +1,10 @@
-# EscrowMint Python
+<p align="center">
+  <img src="logo.png" alt="EscrowMint logo" width="180">
+</p>
 
-Exact, Redis-backed bounded consumption for shared quotas.
+<h1 align="center">EscrowMint Python</h1>
+
+<p align="center">Exact, Redis-backed bounded consumption for shared quotas.</p>
 
 EscrowMint Python is for cases where many threads, processes, or services need to consume from the same global quota without letting it go below zero.
 
