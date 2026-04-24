@@ -1,29 +1,28 @@
-[build-system]
-requires = ["hatchling>=1.26"]
-build-backend = "hatchling.build"
-
 [project]
 name = "escrowmint"
 version = "0.1.0a0"
 description = "Python client for exact Redis-backed bounded consumption."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 license = { text = "MIT" }
 authors = [
-  { name = "Biprakanta Pal" },
+  { name = "Biprakanta Pal", email = "biprakanta.pal@gmail.com" },
 ]
 dependencies = [
-  "redis>=5,<7",
-]
-
-[project.optional-dependencies]
-dev = [
-  "pytest>=8",
-  "pytest-cov>=5",
+    "redis>=6,<7",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--cov=escrowmint --cov-report=term-missing --cov-fail-under=90"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/escrowmint"]
+[build-system]
+requires = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.11",
+]

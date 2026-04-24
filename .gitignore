@@ -1,7 +1,15 @@
-.DS_Store
+# Python-generated files
 __pycache__/
-*.py[cod]
+*.py[oc]
+.coverage
 .pytest_cache/
-dist/
+.ruff_cache/
 build/
-*.egg-info/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+.DS_Store
