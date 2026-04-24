@@ -1,6 +1,6 @@
 # Scripts
 
-This directory contains Redis Lua prototypes for the EscrowMint mutation contract.
+This directory contains the active Redis Lua sources for the EscrowMint Python mutation contract.
 
 Current contents:
 
@@ -10,4 +10,4 @@ Current contents:
 - `cancel.lua`
 - `get_state.lua`
 
-These scripts are intended as the shared behavioral core for both Python and Go clients.
+These scripts are the Python runtime source of truth and the intended shared behavioral reference for the Go client as well.

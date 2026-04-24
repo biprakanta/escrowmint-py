@@ -2,6 +2,8 @@
 
 This document describes the intended v2 design for very hot resources.
 
+V2 is not implemented yet. The current shipped implementation is the v1 reservation model.
+
 ## Why V2 Exists
 
 The v1 model gives exact correctness for a single resource, but each resource is still serialized at Redis.

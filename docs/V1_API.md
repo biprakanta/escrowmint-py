@@ -53,6 +53,7 @@ class Reservation:
     resource: str
     amount: int
     expires_at_ms: int
+    status: str
 
 
 @dataclass(frozen=True)
@@ -85,8 +86,6 @@ class Client:
         self,
         resource: str,
         reservation_id: str,
-        *,
-        idempotency_key: Optional[str] = None,
     ) -> ConsumeResult: ...
 
     def cancel(self, resource: str, reservation_id: str) -> bool: ...
@@ -124,6 +123,7 @@ Common errors:
 - succeeds only if `available >= amount`
 - moves units from available to reserved
 - creates a reservation with expiry
+- expired reservations are reclaimed lazily on the next mutation or `get_state`
 - same reservation ID must be safe to retry
 
 ### `commit`
@@ -140,6 +140,7 @@ Common errors:
 ### `get_state`
 
 - returns current logical view for one resource
+- performs lazy expiry reclaim for that resource before returning
 - v1 does not promise a globally linearizable read across multiple resources
 
 ## Recommended Defaults

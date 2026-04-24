@@ -32,22 +32,15 @@ The minimal primitives are:
 
 - `try_consume(resource, amount, idempotency_key=None)`
 - `reserve(resource, amount, ttl_ms, reservation_id=None)`
-- `commit(resource, reservation_id, idempotency_key=None)`
+- `commit(resource, reservation_id)`
 - `cancel(resource, reservation_id)`
 - `get_state(resource)`
 
 These operations are executed atomically in Redis via Lua scripts or Redis Functions.
 
-## Planned Package
+## Package
 
-The intended package name is `escrowmint`.
-
-The Python client should expose:
-
-- a small synchronous client first
-- Redis-backed atomic operations via Lua scripts
-- typed exceptions
-- integration tests against a real Redis instance
+The package name is `escrowmint`.
 
 The current implementation includes:
 
@@ -92,17 +85,23 @@ For PyPI publishing, the intended flow is:
 ```text
 escrowmint-py/
   README.md
+  LICENSE
   pyproject.toml
   docs/
     ARCHITECTURE.md
     V1_API.md
+    V2_ESCROW.md
   scripts/
     try_consume.lua
     reserve.lua
     commit.lua
     cancel.lua
+    get_state.lua
   src/
     escrowmint/
+  .github/
+    workflows/
+      ci.yml
   tests/
 ```
 
