@@ -5,12 +5,17 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: escrowmint-py-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  lint-test-build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -34,3 +39,6 @@ jobs:
 
       - name: Run tests
         run: uv run pytest
+
+      - name: Build distributions
+        run: uv build

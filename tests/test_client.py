@@ -6,15 +6,23 @@ import pytest
 from redis import Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import ResponseError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from escrowmint import (
     BackendUnavailable,
     Client,
     ClientConfig,
+    ChunkLease,
+    CorruptState,
     DuplicateIdempotencyConflict,
     InsufficientQuota,
     InvalidAmount,
+    InvalidOwner,
     InvalidTTL,
+    LeaseAlreadyReleased,
+    LeaseExpired,
+    LeaseNotFound,
+    LeaseOwnershipMismatch,
     ReservationAlreadyCommitted,
     ReservationExpired,
     ReservationNotFound,
@@ -44,6 +52,9 @@ def test_reserve_rejects_invalid_inputs() -> None:
 
     with pytest.raises(InvalidTTL):
         client.reserve("wallet:1", 1, ttl_ms=0)
+
+    with pytest.raises(InvalidOwner):
+        client.allocate_chunk("wallet:1", 1, owner_id="", ttl_ms=1000)
 
 
 def test_seed_available_rejects_negative_amount() -> None:
@@ -170,6 +181,7 @@ def test_reserve_rejects_conflicting_reuse_of_reservation_id(redis_url: str) -> 
 
 def test_commit_burns_reserved_quota(redis_url: str) -> None:
     client = Client.from_url(redis_url)
+    redis_client = Redis.from_url(redis_url, decode_responses=True)
     client.seed_available("wallet:204", 10)
     reservation = client.reserve("wallet:204", 3, ttl_ms=5_000, reservation_id="res-3")
 
@@ -181,6 +193,8 @@ def test_commit_burns_reserved_quota(redis_url: str) -> None:
     assert state.available == 7
     assert state.reserved == 0
     assert state.version == 2
+    assert redis_client.hlen(client._reservations_key("wallet:204")) == 0
+    assert redis_client.zcard(client._expiries_key("wallet:204")) == 0
 
 
 def test_commit_is_idempotent(redis_url: str) -> None:
@@ -204,6 +218,7 @@ def test_commit_missing_reservation_raises(redis_url: str) -> None:
 
 def test_cancel_releases_reserved_quota(redis_url: str) -> None:
     client = Client.from_url(redis_url)
+    redis_client = Redis.from_url(redis_url, decode_responses=True)
     client.seed_available("wallet:207", 10)
     reservation = client.reserve("wallet:207", 3, ttl_ms=5_000, reservation_id="res-5")
 
@@ -214,6 +229,8 @@ def test_cancel_releases_reserved_quota(redis_url: str) -> None:
     assert state.available == 10
     assert state.reserved == 0
     assert state.version == 2
+    assert redis_client.hlen(client._reservations_key("wallet:207")) == 0
+    assert redis_client.zcard(client._expiries_key("wallet:207")) == 0
 
 
 def test_cancel_returns_false_after_commit(redis_url: str) -> None:
@@ -227,6 +244,7 @@ def test_cancel_returns_false_after_commit(redis_url: str) -> None:
 
 def test_expired_reservation_releases_quota_on_get_state(redis_url: str) -> None:
     client = Client.from_url(redis_url)
+    redis_client = Redis.from_url(redis_url, decode_responses=True)
     client.seed_available("wallet:209", 10)
     client.reserve("wallet:209", 4, ttl_ms=100, reservation_id="res-7")
 
@@ -236,6 +254,8 @@ def test_expired_reservation_releases_quota_on_get_state(redis_url: str) -> None
     assert state.available == 10
     assert state.reserved == 0
     assert state.version == 2
+    assert redis_client.hlen(client._reservations_key("wallet:209")) == 0
+    assert redis_client.zcard(client._expiries_key("wallet:209")) == 0
 
 
 def test_commit_expired_reservation_raises_and_releases(redis_url: str) -> None:
@@ -291,6 +311,178 @@ def test_get_state_reads_existing_redis_hash(redis_url: str) -> None:
     assert state.version == 9
 
 
+def test_allocate_chunk_holds_quota_until_release(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    client.seed_available("wallet:300", 20)
+
+    lease = client.allocate_chunk("wallet:300", 6, owner_id="worker-a", ttl_ms=5_000)
+    state = client.get_state("wallet:300")
+
+    assert isinstance(lease, ChunkLease)
+    assert lease.owner_id == "worker-a"
+    assert lease.granted == 6
+    assert lease.remaining == 6
+    assert lease.status == "active"
+    assert state.available == 14
+
+
+def test_allocate_chunk_is_idempotent_for_same_lease_id(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    client.seed_available("wallet:301", 20)
+
+    first = client.allocate_chunk(
+        "wallet:301",
+        5,
+        owner_id="worker-a",
+        ttl_ms=5_000,
+        lease_id="lease-1",
+    )
+    second = client.allocate_chunk(
+        "wallet:301",
+        5,
+        owner_id="worker-a",
+        ttl_ms=5_000,
+        lease_id="lease-1",
+    )
+
+    assert first == second
+
+
+def test_allocate_chunk_rejects_reuse_of_released_lease_id(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    client.seed_available("wallet:302", 20)
+    lease = client.allocate_chunk(
+        "wallet:302",
+        5,
+        owner_id="worker-a",
+        ttl_ms=5_000,
+        lease_id="lease-2",
+    )
+    client.release_chunk("wallet:302", lease.lease_id, owner_id="worker-a")
+
+    with pytest.raises(LeaseAlreadyReleased):
+        client.allocate_chunk(
+            "wallet:302",
+            5,
+            owner_id="worker-a",
+            ttl_ms=5_000,
+            lease_id="lease-2",
+        )
+
+
+def test_consume_chunk_updates_lease_remaining_without_touching_available(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    client.seed_available("wallet:303", 20)
+    lease = client.allocate_chunk("wallet:303", 8, owner_id="worker-a", ttl_ms=5_000)
+
+    result = client.consume_chunk("wallet:303", lease.lease_id, 3, owner_id="worker-a")
+    refreshed = client.get_chunk("wallet:303", lease.lease_id)
+    state = client.get_state("wallet:303")
+
+    assert result.applied is True
+    assert result.remaining == 5
+    assert refreshed.remaining == 5
+    assert state.available == 12
+
+
+def test_consume_chunk_returns_applied_false_when_lease_remaining_is_low(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    client.seed_available("wallet:304", 20)
+    lease = client.allocate_chunk("wallet:304", 4, owner_id="worker-a", ttl_ms=5_000)
+
+    result = client.consume_chunk("wallet:304", lease.lease_id, 6, owner_id="worker-a")
+
+    assert result.applied is False
+    assert result.remaining == 4
+
+
+def test_release_chunk_returns_unused_quota(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    redis_client = Redis.from_url(redis_url, decode_responses=True)
+    client.seed_available("wallet:305", 20)
+    lease = client.allocate_chunk("wallet:305", 10, owner_id="worker-a", ttl_ms=5_000)
+    client.consume_chunk("wallet:305", lease.lease_id, 4, owner_id="worker-a")
+
+    released = client.release_chunk("wallet:305", lease.lease_id, owner_id="worker-a")
+    state = client.get_state("wallet:305")
+
+    assert released.status == "released"
+    assert released.remaining == 6
+    assert state.available == 16
+    assert redis_client.hlen(client._chunk_leases_key("wallet:305")) == 0
+    assert redis_client.zcard(client._chunk_expiries_key("wallet:305")) == 0
+
+
+def test_release_chunk_is_idempotent(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    client.seed_available("wallet:306", 20)
+    lease = client.allocate_chunk("wallet:306", 5, owner_id="worker-a", ttl_ms=5_000)
+
+    first = client.release_chunk("wallet:306", lease.lease_id, owner_id="worker-a")
+    second = client.release_chunk("wallet:306", lease.lease_id, owner_id="worker-a")
+
+    assert first == second
+
+
+def test_consume_chunk_rejects_wrong_owner(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    client.seed_available("wallet:307", 20)
+    lease = client.allocate_chunk("wallet:307", 5, owner_id="worker-a", ttl_ms=5_000)
+
+    with pytest.raises(LeaseOwnershipMismatch):
+        client.consume_chunk("wallet:307", lease.lease_id, 1, owner_id="worker-b")
+
+
+def test_renew_chunk_extends_expiry(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    client.seed_available("wallet:308", 20)
+    lease = client.allocate_chunk("wallet:308", 5, owner_id="worker-a", ttl_ms=150)
+
+    time.sleep(0.05)
+    renewed = client.renew_chunk("wallet:308", lease.lease_id, owner_id="worker-a", ttl_ms=500)
+
+    assert renewed.expires_at_ms > lease.expires_at_ms
+
+    time.sleep(0.2)
+    result = client.consume_chunk("wallet:308", lease.lease_id, 2, owner_id="worker-a")
+    assert result.applied is True
+
+
+def test_expired_chunk_releases_remaining_on_get_state(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    client.seed_available("wallet:309", 20)
+    lease = client.allocate_chunk("wallet:309", 10, owner_id="worker-a", ttl_ms=100)
+    client.consume_chunk("wallet:309", lease.lease_id, 4, owner_id="worker-a")
+
+    time.sleep(0.2)
+    state = client.get_state("wallet:309")
+
+    assert state.available == 16
+    with pytest.raises(LeaseExpired):
+        client.consume_chunk("wallet:309", lease.lease_id, 1, owner_id="worker-a")
+
+
+def test_get_chunk_returns_terminal_receipt_after_release(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    client.seed_available("wallet:310", 20)
+    lease = client.allocate_chunk("wallet:310", 5, owner_id="worker-a", ttl_ms=5_000)
+    client.consume_chunk("wallet:310", lease.lease_id, 2, owner_id="worker-a")
+    client.release_chunk("wallet:310", lease.lease_id, owner_id="worker-a")
+
+    chunk = client.get_chunk("wallet:310", lease.lease_id)
+
+    assert chunk.status == "released"
+    assert chunk.remaining == 3
+
+
+def test_get_chunk_missing_lease_raises(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    client.seed_available("wallet:311", 20)
+
+    with pytest.raises(LeaseNotFound):
+        client.get_chunk("wallet:311", "missing")
+
+
 def test_try_consume_handles_concurrent_requests_without_overspending(redis_url: str) -> None:
     base_client = Client.from_url(redis_url)
     base_client.seed_available("wallet:214", 50)
@@ -328,7 +520,7 @@ class _RedisStub:
             return self._script_stubs.pop(0)
         return _ScriptStub()
 
-    def delete(self, key: str) -> None:
+    def delete(self, *keys: str) -> None:
         return None
 
     def hset(self, key: str, mapping: dict[str, int]) -> None:
@@ -405,3 +597,60 @@ def test_get_state_maps_connection_error_to_backend_unavailable() -> None:
 
     with pytest.raises(BackendUnavailable):
         client.get_state("wallet:stub")
+
+
+def test_get_state_maps_timeout_error_to_backend_unavailable() -> None:
+    client = Client(
+        ClientConfig(),
+        redis_client=_RedisStub(
+            script_stubs=[
+                _ScriptStub(),
+                _ScriptStub(),
+                _ScriptStub(),
+                _ScriptStub(),
+                _ScriptStub(exc=RedisTimeoutError("boom")),
+            ]
+        ),
+    )
+
+    with pytest.raises(BackendUnavailable):
+        client.get_state("wallet:stub")
+
+
+def test_try_consume_maps_corrupt_state_script_error() -> None:
+    client = Client(
+        ClientConfig(),
+        redis_client=_RedisStub(
+            script_stubs=[
+                _ScriptStub(exc=ResponseError("CORRUPT_STATE")),
+                _ScriptStub(),
+                _ScriptStub(),
+                _ScriptStub(),
+                _ScriptStub(),
+            ]
+        ),
+    )
+
+    with pytest.raises(CorruptState):
+        client.try_consume("wallet:stub", 1)
+
+
+def test_get_state_raises_corrupt_state_for_malformed_reservation_payload(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    redis_client = Redis.from_url(redis_url, decode_responses=True)
+    client.seed_available("wallet:215", 5)
+    redis_client.hset(client._reservations_key("wallet:215"), mapping={"bad": "{not-json"})
+    redis_client.zadd(client._expiries_key("wallet:215"), {"bad": 1})
+
+    with pytest.raises(CorruptState):
+        client.get_state("wallet:215")
+
+
+def test_commit_raises_corrupt_state_for_malformed_receipt(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    redis_client = Redis.from_url(redis_url, decode_responses=True)
+    client.seed_available("wallet:216", 5)
+    redis_client.set(client._receipt_key("wallet:216", "res-bad"), "{not-json")
+
+    with pytest.raises(CorruptState):
+        client.commit("wallet:216", "res-bad")

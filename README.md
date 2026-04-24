@@ -85,12 +85,33 @@ client.cancel(resource, reservation_id)
 client.get_state(resource)
 ```
 
+## V2 Chunk Leases
+
+EscrowMint now also ships the explicit v2 chunk-lease lifecycle for hot resources:
+
+```python
+lease = client.allocate_chunk(
+    "wallet:123",
+    100,
+    owner_id="worker-a",
+    ttl_ms=30_000,
+)
+
+result = client.consume_chunk("wallet:123", lease.lease_id, 5, owner_id="worker-a")
+lease = client.renew_chunk("wallet:123", lease.lease_id, owner_id="worker-a", ttl_ms=30_000)
+lease = client.release_chunk("wallet:123", lease.lease_id, owner_id="worker-a")
+```
+
+This is the authoritative distributed chunk path. It keeps chunk state in Redis and supports expiry reclaim, renew, release, and worker ownership checks.
+
 ## How It Works
 
 - Redis remains the source of truth for each resource.
 - Lua scripts make each operation atomic.
 - Reservations move units from `available` to `reserved`.
-- Expired reservations are reclaimed lazily on the next touch of that resource.
+- Pending reservations are indexed by expiry time in Redis.
+- Expired reservations are reclaimed lazily in bounded batches on the next touch of that resource.
+- Terminal reservation outcomes are moved into short-lived receipt keys so the hot reservation hash stays small.
 
 ## V1 vs V2
 
@@ -100,11 +121,13 @@ Use the current v1 model for most workloads:
 - simple Redis-first deployment
 - reservation lifecycle with crash recovery
 
-Planned v2 is for very hot resources:
+Use v2 chunk leases when a resource needs an explicit worker-owned allocation model:
 
 - escrow or chunk allocation per worker
-- fewer Redis round trips on the hottest path
-- more complexity in exchange for higher throughput
+- cleaner lease-level accounting than touching global availability on every operation
+- more complexity in exchange for better control over very hot resources
+
+The current v2 implementation is the authoritative lease lifecycle. A purely local in-process chunk buffer is still something callers can layer on top if they want to trade off crash recovery for fewer network round trips.
 
 See [docs/V2_ESCROW.md](/Users/biprakantapal/Desktop/codex-plugins/escrowmint-py/docs/V2_ESCROW.md).
 

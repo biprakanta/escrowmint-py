@@ -73,7 +73,8 @@ Using one key per idempotency token keeps expiry simple and portable.
 3. reject if `available < amount`
 4. decrement `available`
 5. increment `reserved`
-6. create reservation payload
+6. create reservation payload in the pending reservations hash
+7. index the reservation in the expiry sorted set
 7. increment `version`
 
 ### Commit
@@ -82,9 +83,9 @@ Using one key per idempotency token keeps expiry simple and portable.
 2. reject if missing or expired
 3. ensure it is not already committed
 4. decrement `reserved`
-5. mark reservation as committed
+5. delete the pending reservation and expiry index entry
+6. store a short-lived committed receipt for idempotent retries
 6. increment `version`
-7. store idempotent result if provided
 
 ### Cancel
 
@@ -94,7 +95,8 @@ Using one key per idempotency token keeps expiry simple and portable.
 4. if committed, reject or return false based on final API choice
 5. decrement `reserved`
 6. increment `available`
-7. mark reservation as canceled
+7. delete the pending reservation and expiry index entry
+8. store a short-lived canceled receipt
 8. increment `version`
 
 ## Expiry Strategy
@@ -102,6 +104,8 @@ Using one key per idempotency token keeps expiry simple and portable.
 V1 should use lazy expiration first.
 
 That means expired reservations are reclaimed during normal operations on the same resource, instead of requiring a global background sweeper.
+
+Reclaim is intentionally bounded per call by an expiry sorted set scan, which avoids full `HGETALL` passes over every reservation on the hot path.
 
 This keeps v1 simple while preserving correctness.
 
@@ -145,3 +149,4 @@ Every client should emit:
 - all keys for one resource must share the same hash tag in Redis Cluster
 - integer-only arithmetic avoids rounding bugs
 - Redis server time is preferable for expiry checks to avoid client clock skew
+- terminal reservation state is kept in short-lived receipt keys instead of the hot pending hash
