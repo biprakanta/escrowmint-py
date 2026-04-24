@@ -168,6 +168,12 @@ Notes:
 - tests use Docker-backed Redis integration cases
 - coverage is enforced from [pyproject.toml](pyproject.toml)
 
+## Support
+
+- Python: `3.13+`
+- Redis: intended for modern Redis deployments that support Lua scripting and standard key expiry semantics
+- Stability: the package is approaching its first public `0.1.x` release; expect the core API to be much more stable than the surrounding release/docs tooling
+
 ## Release Process
 
 EscrowMint Python uses Conventional Commits and Release Please for semantic versioning and release notes.
@@ -186,3 +192,4 @@ When releasable commits land on `main`, Release Please opens or updates a releas
 - [Lua Scripts](scripts/README.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
+- [Release Checklist](RELEASE_CHECKLIST.md)
