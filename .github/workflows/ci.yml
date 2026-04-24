@@ -38,9 +38,9 @@ jobs:
 
       - name: Check README install instructions
         run: |
-          ! rg -n "Until the first PyPI release|git\\+https://github.com/biprakanta/escrowmint-py" README.md
-          rg -n "uv add escrowmint" README.md
-          rg -n "pip install escrowmint" README.md
+          ! grep -nE "Until the first PyPI release|git\\+https://github.com/biprakanta/escrowmint-py" README.md
+          grep -nF "uv add escrowmint" README.md
+          grep -nF "pip install escrowmint" README.md
 
       - name: Run lint
         run: uv run ruff check
