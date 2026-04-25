@@ -28,6 +28,7 @@ Good fits:
 
 EscrowMint is not a generic counter library. It is a quota and reservation library with application-level semantics:
 
+- consistent pool top-up
 - exact bounded decrement
 - idempotent consume
 - reservation with TTL
@@ -65,6 +66,19 @@ print(result.applied)      # True
 print(result.remaining)    # remaining global quota
 ```
 
+## Top Up Pool
+
+```python
+result = client.top_up(
+    "wallet:123",
+    25,
+    idempotency_key="credit-001",
+)
+
+print(result.added)        # 25
+print(result.available)    # current global quota after top-up
+```
+
 ## Crash-Safe Reservation
 
 ```python
@@ -91,6 +105,7 @@ If a worker crashes after `reserve` but before `commit`, the held quota is relea
 
 ```python
 client.try_consume(resource, amount, idempotency_key=None)
+client.top_up(resource, amount, idempotency_key=None)
 client.reserve(resource, amount, ttl_ms=..., reservation_id=None)
 client.commit(resource, reservation_id)
 client.cancel(resource, reservation_id)
@@ -121,6 +136,7 @@ This is the authoritative distributed chunk path. It keeps chunk state in Redis 
 - Redis remains the source of truth for each resource.
 - Lua scripts make each operation atomic.
 - Reservations move units from `available` to `reserved`.
+- Top-ups add units back into `available` without bypassing expiry reclaim.
 - Pending reservations are indexed by expiry time in Redis.
 - Expired reservations are reclaimed lazily in bounded batches on the next touch of that resource.
 - Terminal reservation outcomes are moved into short-lived receipt keys so the hot reservation hash stays small.
@@ -132,6 +148,7 @@ EscrowMint currently ships both models.
 The direct path is the shared-resource path:
 
 - `try_consume`, `reserve`, `commit`, and `cancel`
+- `top_up` for consistent replenishment of the shared pool
 - exact bounded updates against the resource's shared state
 - the simplest way to get correctness and crash recovery
 

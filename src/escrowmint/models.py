@@ -9,6 +9,13 @@ class ConsumeResult:
 
 
 @dataclass(frozen=True)
+class TopUpResult:
+    added: int
+    available: int
+    operation_id: str
+
+
+@dataclass(frozen=True)
 class ResourceState:
     resource: str
     available: int

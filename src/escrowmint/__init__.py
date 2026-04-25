@@ -18,7 +18,14 @@ from .errors import (
     ReservationExpired,
     ReservationNotFound,
 )
-from .models import ChunkConsumeResult, ChunkLease, ConsumeResult, Reservation, ResourceState
+from .models import (
+    ChunkConsumeResult,
+    ChunkLease,
+    ConsumeResult,
+    Reservation,
+    ResourceState,
+    TopUpResult,
+)
 
 __all__ = [
     "BackendUnavailable",
@@ -43,4 +50,5 @@ __all__ = [
     "ReservationExpired",
     "ReservationNotFound",
     "ResourceState",
+    "TopUpResult",
 ]

@@ -20,6 +20,7 @@ from ._lua import (
     RELEASE_CHUNK,
     RENEW_CHUNK,
     RESERVE,
+    TOP_UP,
     TRY_CONSUME,
 )
 from .errors import (
@@ -38,7 +39,14 @@ from .errors import (
     ReservationExpired,
     ReservationNotFound,
 )
-from .models import ChunkConsumeResult, ChunkLease, ConsumeResult, Reservation, ResourceState
+from .models import (
+    ChunkConsumeResult,
+    ChunkLease,
+    ConsumeResult,
+    Reservation,
+    ResourceState,
+    TopUpResult,
+)
 
 
 @dataclass(frozen=True)
@@ -58,6 +66,7 @@ class Client:
             socket_timeout=config.socket_timeout_s,
         )
         self._try_consume_script = self._redis.register_script(TRY_CONSUME)
+        self._top_up_script = self._redis.register_script(TOP_UP)
         self._reserve_script = self._redis.register_script(RESERVE)
         self._commit_script = self._redis.register_script(COMMIT)
         self._cancel_script = self._redis.register_script(CANCEL)
@@ -86,7 +95,7 @@ class Client:
         state_key = self._state_key(resource)
         reservations_key = self._reservations_key(resource)
         idem_key = self._idempotency_key(resource, idempotency_key)
-        fingerprint = self._fingerprint(resource=resource, amount=amount)
+        fingerprint = self._fingerprint(operation="consume", resource=resource, amount=amount)
 
         raw_result = self._run_script(
             self._try_consume_script,
@@ -111,6 +120,43 @@ class Client:
         return ConsumeResult(
             applied=bool(payload["applied"]),
             remaining=int(payload["remaining"]),
+            operation_id=str(payload["operation_id"]),
+        )
+
+    def top_up(
+        self,
+        resource: str,
+        amount: int,
+        *,
+        idempotency_key: Optional[str] = None,
+    ) -> TopUpResult:
+        if amount <= 0:
+            raise InvalidAmount("amount must be a positive integer")
+
+        operation_id = str(uuid.uuid4())
+        raw_result = self._run_script(
+            self._top_up_script,
+            keys=[
+                self._state_key(resource),
+                self._reservations_key(resource),
+                self._expiries_key(resource),
+                self._chunk_leases_key(resource),
+                self._chunk_expiries_key(resource),
+                self._idempotency_key(resource, idempotency_key),
+            ],
+            args=[
+                amount,
+                operation_id,
+                self.config.idempotency_ttl_ms,
+                self._fingerprint(operation="top_up", resource=resource, amount=amount),
+                self.config.idempotency_ttl_ms,
+            ],
+        )
+
+        payload = self._load_payload(raw_result)
+        return TopUpResult(
+            added=int(payload["added"]),
+            available=int(payload["available"]),
             operation_id=str(payload["operation_id"]),
         )
 
@@ -396,8 +442,10 @@ class Client:
         return keys
 
     @staticmethod
-    def _fingerprint(*, resource: str, amount: int) -> str:
-        digest = hashlib.sha256(f"{resource}:{amount}".encode("utf-8")).hexdigest()
+    def _fingerprint(*, operation: str, resource: str, amount: int) -> str:
+        digest = hashlib.sha256(
+            f"{operation}:{resource}:{amount}".encode("utf-8")
+        ).hexdigest()
         return digest
 
     @staticmethod
