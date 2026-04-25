@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/biprakanta/escrowmint-py/compare/v0.4.0...v0.5.0) (2026-04-25)
+
+
+### Features
+
+* add client cleanup helpers and package metadata ([#19](https://github.com/biprakanta/escrowmint-py/issues/19)) ([5e93b69](https://github.com/biprakanta/escrowmint-py/commit/5e93b69e24fa9855c2759efb4cf48b2f8546e1c8))
+
 ## [0.4.0](https://github.com/biprakanta/escrowmint-py/compare/v0.3.3...v0.4.0) (2026-04-25)
 
 

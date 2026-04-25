@@ -1,6 +1,6 @@
 [project]
 name = "escrowmint"
-version = "0.4.0"
+version = "0.5.0"
 description = "Redis-backed bounded quota primitives for prepaid credits, reservations, top-ups, and chunk leases."
 readme = "README.md"
 requires-python = ">=3.8"
