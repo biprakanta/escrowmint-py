@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.2](https://github.com/biprakanta/escrowmint-py/compare/v0.3.1...v0.3.2) (2026-04-25)
+
+
+### Bug Fixes
+
+* allow python release changelog spellcheck tokens ([#14](https://github.com/biprakanta/escrowmint-py/issues/14)) ([93ce788](https://github.com/biprakanta/escrowmint-py/commit/93ce788a38266c671c792ad9e92bf49f1177a41f))
+* checkout before python version setup in publish job ([#12](https://github.com/biprakanta/escrowmint-py/issues/12)) ([2bd8a2b](https://github.com/biprakanta/escrowmint-py/commit/2bd8a2b19969e1b4aeded09a2300ce7d48e1c4ec))
+* use dedicated token for release-please PRs ([#10](https://github.com/biprakanta/escrowmint-py/issues/10)) ([85b7445](https://github.com/biprakanta/escrowmint-py/commit/85b7445e817a18bd8535416bde93f03dbf3f35fa))
+
 ## [0.3.1](https://github.com/biprakanta/escrowmint-py/compare/v0.3.0...v0.3.1) (2026-04-24)
 
 
