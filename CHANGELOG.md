@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/biprakanta/escrowmint-py/compare/v0.3.3...v0.4.0) (2026-04-25)
+
+
+### Features
+
+* add consistent pool top-up API ([#17](https://github.com/biprakanta/escrowmint-py/issues/17)) ([ed97a1e](https://github.com/biprakanta/escrowmint-py/commit/ed97a1e7d13ebbcae9bc8574e14551410c963d20))
+
 ## [0.3.3](https://github.com/biprakanta/escrowmint-py/compare/v0.3.2...v0.3.3) (2026-04-25)
 
 
