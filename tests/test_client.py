@@ -1,4 +1,5 @@
 import concurrent.futures
+import json
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -148,6 +149,35 @@ def test_try_consume_is_idempotent_for_retries(redis_url: str) -> None:
     assert first == second
     assert state.available == 6
     assert state.version == 1
+
+
+def test_try_consume_replays_legacy_idempotency_records(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    client.seed_available("wallet:125-legacy", 6)
+    client._redis.set(
+        client._idempotency_key("wallet:125-legacy", "req-legacy"),
+        json.dumps(
+            {
+                "request_fingerprint": client._fingerprint(
+                    resource="wallet:125-legacy",
+                    amount=4,
+                ),
+                "applied": True,
+                "remaining": 6,
+                "operation_id": "op-legacy",
+            }
+        ),
+        px=client.config.idempotency_ttl_ms,
+    )
+
+    result = client.try_consume("wallet:125-legacy", 4, idempotency_key="req-legacy")
+    state = client.get_state("wallet:125-legacy")
+
+    assert result.applied is True
+    assert result.remaining == 6
+    assert result.operation_id == "op-legacy"
+    assert state.available == 6
+    assert state.version == 0
 
 
 def test_try_consume_rejects_conflicting_idempotency_reuse(redis_url: str) -> None:

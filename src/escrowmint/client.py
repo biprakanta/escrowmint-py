@@ -95,7 +95,7 @@ class Client:
         state_key = self._state_key(resource)
         reservations_key = self._reservations_key(resource)
         idem_key = self._idempotency_key(resource, idempotency_key)
-        fingerprint = self._fingerprint(operation="consume", resource=resource, amount=amount)
+        fingerprint = self._fingerprint(resource=resource, amount=amount)
 
         raw_result = self._run_script(
             self._try_consume_script,
@@ -442,10 +442,12 @@ class Client:
         return keys
 
     @staticmethod
-    def _fingerprint(*, operation: str, resource: str, amount: int) -> str:
-        digest = hashlib.sha256(
-            f"{operation}:{resource}:{amount}".encode("utf-8")
-        ).hexdigest()
+    def _fingerprint(*, resource: str, amount: int, operation: Optional[str] = None) -> str:
+        if operation in (None, "", "consume"):
+            value = f"{resource}:{amount}"
+        else:
+            value = f"{operation}:{resource}:{amount}"
+        digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
         return digest
 
     @staticmethod
