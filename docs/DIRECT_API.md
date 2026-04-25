@@ -48,6 +48,13 @@ class ConsumeResult:
 
 
 @dataclass(frozen=True)
+class TopUpResult:
+    added: int
+    available: int
+    operation_id: str
+
+
+@dataclass(frozen=True)
 class Reservation:
     reservation_id: str
     resource: str
@@ -72,6 +79,14 @@ class Client:
         *,
         idempotency_key: Optional[str] = None,
     ) -> ConsumeResult: ...
+
+    def top_up(
+        self,
+        resource: str,
+        amount: int,
+        *,
+        idempotency_key: Optional[str] = None,
+    ) -> TopUpResult: ...
 
     def reserve(
         self,
@@ -116,6 +131,14 @@ Common errors:
 - succeeds only if `available >= amount`
 - permanently burns quota
 - returns `applied=False` on insufficient quota
+- if an idempotency key is reused with the same request, returns the original result
+- if an idempotency key is reused with a conflicting request shape, returns `DuplicateIdempotencyConflict`
+
+### `top_up`
+
+- succeeds only if `amount > 0`
+- reclaims expired reservations and chunk leases for the resource before adding new quota
+- increments `available` atomically
 - if an idempotency key is reused with the same request, returns the original result
 - if an idempotency key is reused with a conflicting request shape, returns `DuplicateIdempotencyConflict`
 

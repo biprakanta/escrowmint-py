@@ -349,6 +349,77 @@ end
 return cjson.encode(result)
 """
 
+TOP_UP = _COMMON + """\
+local state_key = KEYS[1]
+local reservations_key = KEYS[2]
+local reservation_expiries_key = KEYS[3]
+local chunk_leases_key = KEYS[4]
+local chunk_expiries_key = KEYS[5]
+local idem_key = KEYS[6]
+
+local amount = tonumber(ARGV[1])
+local operation_id = ARGV[2]
+local idem_ttl_ms = tonumber(ARGV[3])
+local request_fingerprint = ARGV[4]
+local receipt_ttl_ms = tonumber(ARGV[5])
+
+if amount == nil or amount <= 0 then
+  return redis.error_reply("INVALID_AMOUNT")
+end
+
+local available, reserved, version, _, reclaim_err = reclaim_all(
+  state_key,
+  reservations_key,
+  reservation_expiries_key,
+  chunk_leases_key,
+  chunk_expiries_key,
+  receipt_ttl_ms
+)
+if reclaim_err then
+  return redis.error_reply(reclaim_err)
+end
+
+if idem_key ~= nil and idem_key ~= "" then
+  local existing = redis.call("GET", idem_key)
+  if existing then
+    local payload = decode_payload(existing)
+    if not payload then
+      return redis.error_reply("CORRUPT_STATE")
+    end
+    if payload["request_fingerprint"] ~= request_fingerprint then
+      return redis.error_reply("DUPLICATE_IDEMPOTENCY_CONFLICT")
+    end
+    return cjson.encode({
+      added = payload["added"],
+      available = payload["available"],
+      operation_id = payload["operation_id"],
+    })
+  end
+end
+
+available = available + amount
+version = version + 1
+persist_state(state_key, available, reserved, version)
+
+local result = {
+  added = amount,
+  available = available,
+  operation_id = operation_id,
+}
+
+if idem_key ~= nil and idem_key ~= "" then
+  local payload = {
+    request_fingerprint = request_fingerprint,
+    added = amount,
+    available = available,
+    operation_id = operation_id,
+  }
+  redis.call("SET", idem_key, cjson.encode(payload), "PX", idem_ttl_ms)
+end
+
+return cjson.encode(result)
+"""
+
 RESERVE = _COMMON + """\
 local state_key = KEYS[1]
 local reservations_key = KEYS[2]

@@ -1,4 +1,5 @@
 import concurrent.futures
+import json
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -28,7 +29,7 @@ from escrowmint import (
     ReservationExpired,
     ReservationNotFound,
 )
-from escrowmint._lua import CANCEL, COMMIT, GET_STATE, RESERVE, TRY_CONSUME
+from escrowmint._lua import CANCEL, COMMIT, GET_STATE, RESERVE, TOP_UP, TRY_CONSUME
 
 
 def test_client_from_url() -> None:
@@ -43,6 +44,13 @@ def test_try_consume_rejects_invalid_amount() -> None:
 
     with pytest.raises(InvalidAmount):
         client.try_consume("wallet:1", 0)
+
+
+def test_top_up_rejects_invalid_amount() -> None:
+    client = Client.from_url("redis://localhost:6379/0")
+
+    with pytest.raises(InvalidAmount):
+        client.top_up("wallet:1", 0)
 
 
 def test_reserve_rejects_invalid_inputs() -> None:
@@ -92,6 +100,7 @@ def test_embedded_lua_matches_repo_scripts() -> None:
 
     expectations = {
         "try_consume.lua": TRY_CONSUME,
+        "top_up.lua": TOP_UP,
         "reserve.lua": RESERVE,
         "commit.lua": COMMIT,
         "cancel.lua": CANCEL,
@@ -142,6 +151,35 @@ def test_try_consume_is_idempotent_for_retries(redis_url: str) -> None:
     assert state.version == 1
 
 
+def test_try_consume_replays_legacy_idempotency_records(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    client.seed_available("wallet:125-legacy", 6)
+    client._redis.set(
+        client._idempotency_key("wallet:125-legacy", "req-legacy"),
+        json.dumps(
+            {
+                "request_fingerprint": client._fingerprint(
+                    resource="wallet:125-legacy",
+                    amount=4,
+                ),
+                "applied": True,
+                "remaining": 6,
+                "operation_id": "op-legacy",
+            }
+        ),
+        px=client.config.idempotency_ttl_ms,
+    )
+
+    result = client.try_consume("wallet:125-legacy", 4, idempotency_key="req-legacy")
+    state = client.get_state("wallet:125-legacy")
+
+    assert result.applied is True
+    assert result.remaining == 6
+    assert result.operation_id == "op-legacy"
+    assert state.available == 6
+    assert state.version == 0
+
+
 def test_try_consume_rejects_conflicting_idempotency_reuse(redis_url: str) -> None:
     client = Client.from_url(redis_url)
     client.seed_available("wallet:126", 10)
@@ -149,6 +187,58 @@ def test_try_consume_rejects_conflicting_idempotency_reuse(redis_url: str) -> No
 
     with pytest.raises(DuplicateIdempotencyConflict):
         client.try_consume("wallet:126", 5, idempotency_key="req-2")
+
+
+def test_top_up_applies_and_updates_state(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    client.seed_available("wallet:127", 10)
+
+    result = client.top_up("wallet:127", 4)
+    state = client.get_state("wallet:127")
+
+    assert result.added == 4
+    assert result.available == 14
+    assert state.available == 14
+    assert state.version == 1
+
+
+def test_top_up_is_idempotent_for_retries(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    client.seed_available("wallet:128", 10)
+
+    first = client.top_up("wallet:128", 4, idempotency_key="top-up-1")
+    second = client.top_up("wallet:128", 4, idempotency_key="top-up-1")
+    state = client.get_state("wallet:128")
+
+    assert first == second
+    assert state.available == 14
+    assert state.version == 1
+
+
+def test_top_up_rejects_conflicting_idempotency_reuse(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    client.seed_available("wallet:129", 10)
+    client.top_up("wallet:129", 4, idempotency_key="top-up-2")
+
+    with pytest.raises(DuplicateIdempotencyConflict):
+        client.top_up("wallet:129", 5, idempotency_key="top-up-2")
+
+
+def test_top_up_reclaims_expired_reservations_before_adding(redis_url: str) -> None:
+    client = Client.from_url(redis_url)
+    client.seed_available("wallet:130", 10)
+    client.reserve("wallet:130", 4, ttl_ms=100, reservation_id="res-topup")
+
+    time.sleep(0.15)
+
+    result = client.top_up("wallet:130", 3)
+    state = client.get_state("wallet:130")
+
+    assert result.added == 3
+    assert result.available == 13
+    assert state.available == 13
+    assert state.reserved == 0
+    assert state.version == 3
 
 
 def test_reserve_holds_quota_until_commit(redis_url: str) -> None:
@@ -569,6 +659,7 @@ def test_reserve_maps_insufficient_quota_script_error() -> None:
         redis_client=_RedisStub(
             script_stubs=[
                 _ScriptStub(),
+                _ScriptStub(),
                 _ScriptStub(exc=ResponseError("INSUFFICIENT_QUOTA")),
                 _ScriptStub(),
                 _ScriptStub(),
@@ -586,6 +677,7 @@ def test_commit_maps_already_committed_script_error() -> None:
         ClientConfig(),
         redis_client=_RedisStub(
             script_stubs=[
+                _ScriptStub(),
                 _ScriptStub(),
                 _ScriptStub(),
                 _ScriptStub(exc=ResponseError("RESERVATION_ALREADY_COMMITTED")),
@@ -608,6 +700,7 @@ def test_get_state_maps_connection_error_to_backend_unavailable() -> None:
                 _ScriptStub(),
                 _ScriptStub(),
                 _ScriptStub(),
+                _ScriptStub(),
                 _ScriptStub(exc=RedisConnectionError("boom")),
             ]
         ),
@@ -622,6 +715,7 @@ def test_get_state_maps_timeout_error_to_backend_unavailable() -> None:
         ClientConfig(),
         redis_client=_RedisStub(
             script_stubs=[
+                _ScriptStub(),
                 _ScriptStub(),
                 _ScriptStub(),
                 _ScriptStub(),

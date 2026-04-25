@@ -5,6 +5,7 @@ This directory contains the active Redis Lua sources for the EscrowMint Python m
 Current contents:
 
 - `try_consume.lua`: exact bounded decrement with optional idempotency
+- `top_up.lua`: exact pool replenishment with optional idempotency
 - `reserve.lua`
 - `commit.lua`
 - `cancel.lua`

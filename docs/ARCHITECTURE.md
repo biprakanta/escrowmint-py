@@ -66,6 +66,16 @@ Using one key per idempotency token keeps expiry simple and portable.
 7. store idempotent result if needed
 8. return remaining balance
 
+### Top Up
+
+1. validate amount
+2. reclaim expired reservations and chunk leases for the target resource if needed
+3. check idempotency record if provided
+4. increment `available`
+5. increment `version`
+6. store idempotent result if needed
+7. return current available balance
+
 ### Reserve
 
 1. validate amount and TTL
