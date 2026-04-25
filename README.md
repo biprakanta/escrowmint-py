@@ -54,16 +54,15 @@ pip install escrowmint
 ```python
 from escrowmint import Client
 
-client = Client.from_url("redis://localhost:6379/0")
+with Client.from_url("redis://localhost:6379/0") as client:
+    result = client.try_consume(
+        "wallet:123",
+        5,
+        idempotency_key="req-001",
+    )
 
-result = client.try_consume(
-    "wallet:123",
-    5,
-    idempotency_key="req-001",
-)
-
-print(result.applied)      # True
-print(result.remaining)    # remaining global quota
+    print(result.applied)      # True
+    print(result.remaining)    # remaining global quota
 ```
 
 ## Top Up Pool
@@ -189,7 +188,7 @@ Notes:
 
 - Python: `3.8+`
 - Redis: intended for modern Redis deployments that support Lua scripting and standard key expiry semantics
-- Stability: the package is approaching its first public `0.1.x` release; expect the core API to be much more stable than the surrounding release/docs tooling
+- Stability: the package is published and follows SemVer before `1.0`; breaking API changes remain possible, but release notes will call them out explicitly
 
 ## Release Process
 

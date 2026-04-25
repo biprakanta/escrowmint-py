@@ -39,6 +39,46 @@ def test_client_from_url() -> None:
     assert client.config.key_prefix == "escrowmint"
 
 
+def test_client_close_closes_owned_redis(monkeypatch: pytest.MonkeyPatch) -> None:
+    redis_stub = _RedisStub()
+
+    monkeypatch.setattr(
+        "escrowmint.client.Redis.from_url",
+        lambda *args, **kwargs: redis_stub,
+    )
+
+    client = Client.from_url("redis://localhost:6379/0")
+    client.close()
+    client.close()
+
+    assert redis_stub.close_calls == 1
+
+
+def test_client_context_manager_closes_owned_redis(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    redis_stub = _RedisStub()
+
+    monkeypatch.setattr(
+        "escrowmint.client.Redis.from_url",
+        lambda *args, **kwargs: redis_stub,
+    )
+
+    with Client.from_url("redis://localhost:6379/0") as client:
+        assert client.config.redis_url == "redis://localhost:6379/0"
+
+    assert redis_stub.close_calls == 1
+
+
+def test_client_close_keeps_injected_redis_open() -> None:
+    redis_stub = _RedisStub()
+    client = Client(ClientConfig(), redis_client=redis_stub)
+
+    client.close()
+
+    assert redis_stub.close_calls == 0
+
+
 def test_try_consume_rejects_invalid_amount() -> None:
     client = Client.from_url("redis://localhost:6379/0")
 
@@ -93,9 +133,7 @@ def test_seed_available_clears_stale_replay_keys(redis_url: str) -> None:
 def test_embedded_lua_matches_repo_scripts() -> None:
     def normalize(script: str) -> str:
         return "\n".join(
-            line.rstrip()
-            for line in script.strip().splitlines()
-            if line.strip()
+            line.rstrip() for line in script.strip().splitlines() if line.strip()
         )
 
     expectations = {
@@ -125,7 +163,9 @@ def test_try_consume_applies_and_updates_state(redis_url: str) -> None:
     assert state.version == 1
 
 
-def test_try_consume_returns_applied_false_on_insufficient_quota(redis_url: str) -> None:
+def test_try_consume_returns_applied_false_on_insufficient_quota(
+    redis_url: str,
+) -> None:
     client = Client.from_url(redis_url)
     client.seed_available("wallet:124", 2)
 
@@ -478,7 +518,9 @@ def test_allocate_chunk_rejects_reuse_of_released_lease_id(redis_url: str) -> No
         )
 
 
-def test_consume_chunk_updates_lease_remaining_without_touching_available(redis_url: str) -> None:
+def test_consume_chunk_updates_lease_remaining_without_touching_available(
+    redis_url: str,
+) -> None:
     client = Client.from_url(redis_url)
     client.seed_available("wallet:303", 20)
     lease = client.allocate_chunk("wallet:303", 8, owner_id="worker-a", ttl_ms=5_000)
@@ -493,7 +535,9 @@ def test_consume_chunk_updates_lease_remaining_without_touching_available(redis_
     assert state.available == 12
 
 
-def test_consume_chunk_returns_applied_false_when_lease_remaining_is_low(redis_url: str) -> None:
+def test_consume_chunk_returns_applied_false_when_lease_remaining_is_low(
+    redis_url: str,
+) -> None:
     client = Client.from_url(redis_url)
     client.seed_available("wallet:304", 20)
     lease = client.allocate_chunk("wallet:304", 4, owner_id="worker-a", ttl_ms=5_000)
@@ -547,7 +591,9 @@ def test_renew_chunk_extends_expiry(redis_url: str) -> None:
     lease = client.allocate_chunk("wallet:308", 5, owner_id="worker-a", ttl_ms=150)
 
     time.sleep(0.05)
-    renewed = client.renew_chunk("wallet:308", lease.lease_id, owner_id="worker-a", ttl_ms=500)
+    renewed = client.renew_chunk(
+        "wallet:308", lease.lease_id, owner_id="worker-a", ttl_ms=500
+    )
 
     assert renewed.expires_at_ms > lease.expires_at_ms
 
@@ -591,14 +637,18 @@ def test_get_chunk_missing_lease_raises(redis_url: str) -> None:
         client.get_chunk("wallet:311", "missing")
 
 
-def test_try_consume_handles_concurrent_requests_without_overspending(redis_url: str) -> None:
+def test_try_consume_handles_concurrent_requests_without_overspending(
+    redis_url: str,
+) -> None:
     base_client = Client.from_url(redis_url)
     base_client.seed_available("wallet:214", 50)
 
     clients = [Client.from_url(redis_url) for _ in range(10)]
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        futures = [executor.submit(client.try_consume, "wallet:214", 7) for client in clients]
+        futures = [
+            executor.submit(client.try_consume, "wallet:214", 7) for client in clients
+        ]
         results = [future.result() for future in futures]
 
     applied_count = sum(1 for result in results if result.applied)
@@ -622,11 +672,15 @@ class _ScriptStub:
 class _RedisStub:
     def __init__(self, script_stubs: Optional[List[_ScriptStub]] = None) -> None:
         self._script_stubs = list(script_stubs or [])
+        self.close_calls = 0
 
     def register_script(self, _: str) -> _ScriptStub:
         if self._script_stubs:
             return self._script_stubs.pop(0)
         return _ScriptStub()
+
+    def close(self) -> None:
+        self.close_calls += 1
 
     def delete(self, *keys: str) -> None:
         return None
@@ -747,11 +801,15 @@ def test_try_consume_maps_corrupt_state_script_error() -> None:
         client.try_consume("wallet:stub", 1)
 
 
-def test_get_state_raises_corrupt_state_for_malformed_reservation_payload(redis_url: str) -> None:
+def test_get_state_raises_corrupt_state_for_malformed_reservation_payload(
+    redis_url: str,
+) -> None:
     client = Client.from_url(redis_url)
     redis_client = Redis.from_url(redis_url, decode_responses=True)
     client.seed_available("wallet:215", 5)
-    redis_client.hset(client._reservations_key("wallet:215"), mapping={"bad": "{not-json"})
+    redis_client.hset(
+        client._reservations_key("wallet:215"), mapping={"bad": "{not-json"}
+    )
     redis_client.zadd(client._expiries_key("wallet:215"), {"bad": 1})
 
     with pytest.raises(CorruptState):
