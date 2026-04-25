@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3](https://github.com/biprakanta/escrowmint-py/compare/v0.3.2...v0.3.3) (2026-04-25)
+
+
+### Bug Fixes
+
+* publish Python releases from dedicated workflow ([#15](https://github.com/biprakanta/escrowmint-py/issues/15)) ([c78c8ca](https://github.com/biprakanta/escrowmint-py/commit/c78c8ca6beab83cd1924f8ca95ce3737be70fe28))
+
 ## [0.3.2](https://github.com/biprakanta/escrowmint-py/compare/v0.3.1...v0.3.2) (2026-04-25)
 
 
