@@ -24,5 +24,9 @@ matrix:
             - blockquote
             - img
     sources:
-      - "*.md"
+      # Keep generated changelogs out of spellcheck. Release Please injects short
+      # commit hashes and issue/PR references that Aspell tokenizes into random
+      # pseudo-words, which makes release PRs fail nondeterministically.
+      - "README.md"
+      - "CONTRIBUTING.md"
       - "docs/*.md"

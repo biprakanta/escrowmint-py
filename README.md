@@ -182,7 +182,7 @@ EscrowMint Python uses Conventional Commits and Release Please for semantic vers
 - `feat:` -> minor release
 - `feat!:` or `BREAKING CHANGE:` -> major release
 
-When releasable commits land on `main`, Release Please opens or updates a release PR. Merging that PR updates [CHANGELOG.md](CHANGELOG.md), creates the `vX.Y.Z` tag, creates the GitHub release notes, and then the existing tag workflow publishes the package to PyPI.
+When releasable commits land on `main`, Release Please opens or updates a release PR. Merging that PR updates [CHANGELOG.md](CHANGELOG.md), creates the `vX.Y.Z` tag, and creates the GitHub release notes. The dedicated [release workflow](.github/workflows/release.yml) then verifies the tagged code and publishes the package to PyPI.
 
 ## Docs
 

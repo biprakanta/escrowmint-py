@@ -21,7 +21,7 @@ SemVer mapping:
 1. Merge changes into `main` with Conventional Commit messages.
 2. Release Please opens or updates a release PR.
 3. Merging that release PR updates `CHANGELOG.md`, creates a Git tag, and creates the GitHub release notes.
-4. The existing tag workflow publishes the Python package to PyPI.
+4. The dedicated `release.yml` workflow verifies the tagged code and publishes the Python package to PyPI.
 
 Prefer squash merges so the final commit title on `main` is a clean Conventional Commit.
 
