@@ -58,8 +58,12 @@ class ClientConfig:
 
 
 class Client:
-    def __init__(self, config: ClientConfig, *, redis_client: Optional[Redis] = None) -> None:
+    def __init__(
+        self, config: ClientConfig, *, redis_client: Optional[Redis] = None
+    ) -> None:
         self.config = config
+        self._owns_redis = redis_client is None
+        self._closed = False
         self._redis = redis_client or Redis.from_url(
             config.redis_url,
             decode_responses=True,
@@ -80,6 +84,17 @@ class Client:
     @classmethod
     def from_url(cls, redis_url: str) -> "Client":
         return cls(ClientConfig(redis_url=redis_url))
+
+    def close(self) -> None:
+        if self._owns_redis and not self._closed:
+            self._redis.close()
+            self._closed = True
+
+    def __enter__(self) -> "Client":
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, traceback: Any) -> None:
+        self.close()
 
     def try_consume(
         self,
@@ -337,7 +352,9 @@ class Client:
             status=str(payload["status"]),
         )
 
-    def release_chunk(self, resource: str, lease_id: str, *, owner_id: str) -> ChunkLease:
+    def release_chunk(
+        self, resource: str, lease_id: str, *, owner_id: str
+    ) -> ChunkLease:
         if not owner_id:
             raise InvalidOwner("owner_id must be a non-empty string")
 
@@ -442,7 +459,9 @@ class Client:
         return keys
 
     @staticmethod
-    def _fingerprint(*, resource: str, amount: int, operation: Optional[str] = None) -> str:
+    def _fingerprint(
+        *, resource: str, amount: int, operation: Optional[str] = None
+    ) -> str:
         if operation in (None, "", "consume"):
             value = f"{resource}:{amount}"
         else:
@@ -480,7 +499,9 @@ class Client:
         if "LEASE_ALREADY_RELEASED" in text:
             raise LeaseAlreadyReleased("chunk lease has already been released") from exc
         if "OWNER_MISMATCH" in text:
-            raise LeaseOwnershipMismatch("chunk lease is owned by another worker") from exc
+            raise LeaseOwnershipMismatch(
+                "chunk lease is owned by another worker"
+            ) from exc
         raise exc
 
     @staticmethod
@@ -490,7 +511,9 @@ class Client:
         except json.JSONDecodeError as exc:
             raise CorruptState("backend returned malformed result") from exc
 
-    def _run_script(self, script: object, *, keys: List[str], args: List[object]) -> str:
+    def _run_script(
+        self, script: object, *, keys: List[str], args: List[object]
+    ) -> str:
         try:
             return script(keys=keys, args=args)
         except ResponseError as exc:
